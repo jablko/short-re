@@ -1,0 +1,32 @@
+name: Update learning curves
+on:
+  # When our dependencies change
+  push:
+    paths:
+      - .github/workflows/learning-curves.yml
+      - learning-curves.ts
+      - package.json
+      - tsconfig.json
+jobs:
+  build:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          cache: npm
+      - run: npm ci
+      - run: npm run-script build
+      - name: Make SVG diagram
+        run: node learning-curves > learning-curves.svg
+      - run: git add learning-curves.svg
+      - run: git config user.name .github/workflows/learning-curves.yml
+      - run: git config user.email github-actions@github.com
+      - run: |
+          git diff --quiet --cached ||
+          git commit \
+            --message '🤖 Update learning curves' \
+            --message "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+      - run: git push
