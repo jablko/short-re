@@ -1,0 +1,48 @@
+name: Update learning curves
+on:
+  push:
+    paths-ignore: learning-curves.svg
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  learning-curves:
+    permissions:
+      administration: write
+      #contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - run: ssh-keygen -f deploy-key -N ''
+      - run: wget https://github.com/cli/cli/releases/download/v2.5.0/gh_2.5.0_linux_amd64.tar.gz
+      - run: tar --extract --file gh_2.5.0_linux_amd64.tar.gz
+      - run: gh_2.5.0_linux_amd64/bin/gh repo deploy-key --repo "$GITHUB_REPOSITORY" add deploy-key.pub # https://github.com/cli/cli/pull/3557
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - id: deploy-key
+        run: |
+          echo -n '::set-output name=deploy-key::'
+          # https://github.com/actions/toolkit/blob/15e23998268e31520e3d93cbd106bd3228dea77f/packages/core/src/command.ts#L80
+          perl -e '
+            s/%/%25/g;
+            s/\r/%0D/g;
+            s/\n/%0A/g;
+          ' -p deploy-key
+      - uses: actions/checkout@v2
+        with:
+          ssh-key: ${{ steps.deploy-key.outputs.deploy-key }}
+      - uses: actions/setup-node@v2
+        with:
+          cache: npm
+      - run: npm ci
+      - run: npm run-script build
+      - name: Make SVG diagram
+        run: node learning-curves > learning-curves.svg
+      - run: git add learning-curves.svg
+      - run: git config user.name .github/workflows/learning-curves.yml
+      - run: git config user.email github-actions@github.com
+      - run: |
+          git diff --quiet --cached ||
+          git commit \
+            --message '🤖 Update learning curves' \
+            --message "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+      - run: git push
