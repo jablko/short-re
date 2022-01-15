@@ -1,0 +1,131 @@
+import { axisBottom, axisLeft } from "https://cdn.skypack.dev/d3-axis";
+import { scaleLinear } from "https://cdn.skypack.dev/d3-scale";
+import { schemeTableau10 } from "https://cdn.skypack.dev/d3-scale-chromatic";
+import { select } from "https://cdn.skypack.dev/d3-selection";
+import { line } from "https://cdn.skypack.dev/d3-shape";
+import Viz from "https://cdn.skypack.dev/viz.js";
+import { type Agent, fromUnion } from "./index.js";
+
+// import options from "https://cdn.skypack.dev/viz.js/lite.render.js";
+// throws [Package Error] "fs" does not exist. (Imported by "viz.js").
+// because Skypack converts dynamic -> static imports. Is this a bug in
+// Skypack or Vis.js? ¯\_(ツ)_/¯
+(globalThis as unknown as { Viz: unknown }).Viz = Viz;
+await import("https://unpkg.com/viz.js/lite.render.js");
+const viz = new Viz(undefined as never);
+const episodes = 100;
+
+const width = 640;
+const height = 240;
+const margin = { top: 20, right: 30, bottom: 40, left: 100 };
+
+const x = scaleLinear()
+  .domain([1, episodes])
+  .range([margin.left, width - margin.right]);
+const y = scaleLinear().range([height - margin.bottom, margin.top]);
+const l = line((value, i) => x(i + 1), y);
+const [color] = schemeTableau10;
+
+const svg = select("svg").attr("viewBox", [0, 0, width, height]);
+const axes = svg.append("g");
+const gx = axes
+  .append("g")
+  .attr("transform", `translate(0,${height - margin.bottom})`);
+const xAxis = axisBottom(x);
+xAxis(gx);
+gx.append("text")
+  .attr("x", (width + margin.left - margin.right) / 2)
+  .attr("y", margin.bottom)
+  .attr("font-size", "small")
+  .attr("dominant-baseline", "ideographic")
+  .attr("fill", "currentColor")
+  .text("Episodes");
+const gy = axes.append("g").attr("transform", `translate(${margin.left},0)`);
+const yAxis = axisLeft(y);
+gy.append("foreignObject")
+  .attr("x", -margin.left)
+  .attr("y", margin.top)
+  .attr("width", 60)
+  .attr("height", height - margin.top - margin.bottom)
+  .append("xhtml:div")
+  .style("position", "relative")
+  .style("top", "50%")
+  .style("text-align", "center")
+  .style("transform", "translate(0,-50%)")
+  .text("Pattern length");
+const path = svg.append("path").attr("fill", "none").attr("stroke", color);
+
+let abort: () => void;
+const worker = new Worker("worker.js", { type: "module" });
+const patternOutput = document.getElementById("pattern")!;
+const faOutput = document.getElementById("fa")!;
+const [textarea] = document.getElementsByTagName("textarea");
+textarea.addEventListener("input", run);
+void run();
+
+function run() {
+  abort?.();
+  faOutput.replaceChildren();
+  patternOutput.replaceChildren();
+  const debounce = setTimeout(async () => {
+    const values = textarea.value.split("\n");
+    try {
+      const {
+        ports: [agent],
+      } = await request(worker, values);
+      const { data: from } = (await request(agent, {
+        method: "from",
+      })) as MessageEvent<Agent["from"]>;
+      const final = [...values].sort();
+      const dot = `digraph { ${[
+        ...[...Object.keys(from), String(final)].map(
+          (q) =>
+            `"${q}" [label="${q
+              .split(",")
+              .map((prefix) => String.raw`${prefix}\r`)
+              .join("")}"]`
+        ),
+        ...Object.entries(from).flatMap(([parent, parentTo]) =>
+          Object.entries(parentTo).map(
+            ([child, parentToChild]) =>
+              `"${parent}" -> "${child}" [label="${
+                String(parentToChild)
+                  ? fromUnion(parentToChild).replaceAll("\\", String.raw`\\`)
+                  : "&epsilon;"
+              }"]`
+          )
+        ),
+      ].join(";")} }`;
+      const fa = await viz.renderSVGElement(dot);
+      faOutput.replaceChildren(fa);
+      const cummins: number[] = [];
+      for (let i = 0; i < episodes; i++) {
+        const { data: pattern } = (await request(agent, {
+          method: "episode",
+        })) as MessageEvent<ReturnType<Agent["episode"]>>;
+        if (pattern.length < (cummins[cummins.length - 1] || Infinity))
+          patternOutput.replaceChildren(pattern);
+        cummins.push(
+          Math.min(cummins[cummins.length - 1] || Infinity, pattern.length)
+        );
+        y.domain([0, cummins[0]]).nice();
+        yAxis(gy);
+        path.attr("d", l(cummins));
+      }
+    } catch (e) {
+      if (e) throw e;
+    }
+  }, 500);
+  abort = () => clearTimeout(debounce);
+}
+
+// https://github.com/whatwg/html/issues/6107
+// https://advancedweb.hu/how-to-use-async-await-with-postmessage/
+function request<T>(responder: Pick<MessagePort, "postMessage">, message: T) {
+  return new Promise<MessageEvent>((resolve, reject) => {
+    abort = reject;
+    const { port1, port2 } = new MessageChannel();
+    port1.onmessage = resolve;
+    responder.postMessage(message, [port2]);
+  });
+}
