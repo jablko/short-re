@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "es2022",
+    "moduleResolution": "node",
+    "types": [],
+    "allowSyntheticDefaultImports": true,
+    "lib": ["dom.iterable", "es2021"],
+    "target": "es2017"
+  }
+}
