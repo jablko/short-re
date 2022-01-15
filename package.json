@@ -1,0 +1,25 @@
+{
+  "scripts": {
+    "build": "tsc --build",
+    "test": "prettier --check . && eslint --report-unused-disable-directives ."
+  },
+  "devDependencies": {
+    "@types/d3-axis": "^3.0.1",
+    "@types/d3-scale": "^4.0.2",
+    "@types/d3-selection": "^3.0.2",
+    "@types/d3-shape": "^3.0.2",
+    "@types/jsdom": "^16.2.14",
+    "@types/node": "^17.0.8",
+    "@types/w3c-xmlserializer": "^2.0.2",
+    "@typescript-eslint/eslint-plugin": "^5.9.1",
+    "d3-axis": "^3.0.0",
+    "d3-scale": "^4.0.2",
+    "d3-selection": "^3.0.0",
+    "d3-shape": "^3.1.0",
+    "eslint-plugin-import": "^2.25.4",
+    "jsdom": "^19.0.0",
+    "prettier": "^2.5.1",
+    "w3c-xmlserializer": "^3.0.0"
+  },
+  "type": "module"
+}
