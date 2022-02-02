@@ -4,7 +4,7 @@
     "test": "prettier --check . && eslint --max-warnings 0 . && remark --use preset-lint-recommended --frail ."
   },
   "devDependencies": {
-    "@lhci/cli": "^0.8.2",
+    "@lhci/cli": "^0.9.0",
     "@types/d3-axis": "^3.0.1",
     "@types/d3-delaunay": "^6.0.0",
     "@types/d3-polygon": "^3.0.0",
