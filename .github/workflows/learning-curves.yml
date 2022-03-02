@@ -27,7 +27,7 @@ jobs:
             s/\r/%0D/g;
             s/\n/%0A/g;
           ' -p deploy-key
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ssh-key: ${{ steps.deploy-key.outputs.deploy-key }}
       - uses: actions/setup-node@v2
